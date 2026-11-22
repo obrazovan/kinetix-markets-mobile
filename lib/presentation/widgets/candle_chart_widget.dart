@@ -8,7 +8,7 @@ import '../../domain/entities/candle_point.dart';
 
 enum ChartDisplayMode { candles, area }
 
-/// Interactive TradingView-style OHLC Candlestick & Area Chart with crosshair.
+/// Interactive TradingView-style OHLC Candlestick & Area Chart with SMA & crosshair.
 class CandleChartWidget extends StatefulWidget {
   const CandleChartWidget({
     super.key,
@@ -16,12 +16,14 @@ class CandleChartWidget extends StatefulWidget {
     this.mode = ChartDisplayMode.candles,
     this.height = 240,
     this.averageLineValue,
+    this.smaValues = const [],
   });
 
   final List<CandlePoint> candles;
   final ChartDisplayMode mode;
   final double height;
   final double? averageLineValue;
+  final List<double?> smaValues;
 
   @override
   State<CandleChartWidget> createState() => _CandleChartWidgetState();
@@ -58,11 +60,15 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
       );
     }
 
-    final activeCandle = _selectedIndex != null &&
+    final activeIndex = _selectedIndex != null &&
             _selectedIndex! >= 0 &&
             _selectedIndex! < widget.candles.length
-        ? widget.candles[_selectedIndex!]
-        : widget.candles.last;
+        ? _selectedIndex!
+        : widget.candles.length - 1;
+    final activeCandle = widget.candles[activeIndex];
+    final activeSma = activeIndex < widget.smaValues.length
+        ? widget.smaValues[activeIndex]
+        : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -70,6 +76,7 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
         _OhlcCrosshairBar(
           candle: activeCandle,
           isInspecting: _selectedIndex != null,
+          smaValue: activeSma,
         ),
         const SizedBox(height: 8),
         LayoutBuilder(
@@ -102,6 +109,7 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
                     palette: palette,
                     selectedIndex: _selectedIndex,
                     averageLineValue: widget.averageLineValue,
+                    smaValues: widget.smaValues,
                   ),
                 ),
               ),
@@ -117,10 +125,12 @@ class _OhlcCrosshairBar extends StatelessWidget {
   const _OhlcCrosshairBar({
     required this.candle,
     required this.isInspecting,
+    this.smaValue,
   });
 
   final CandlePoint candle;
   final bool isInspecting;
+  final double? smaValue;
 
   @override
   Widget build(BuildContext context) {
@@ -155,6 +165,8 @@ class _OhlcCrosshairBar extends StatelessWidget {
                 _ohlcTag(context, 'H', candle.high, palette.bull),
                 _ohlcTag(context, 'L', candle.low, palette.bear),
                 _ohlcTag(context, 'C', candle.close, bullColor),
+                if (smaValue != null)
+                  _ohlcTag(context, 'SMA', smaValue!, palette.warning),
               ],
             ),
           ),
@@ -201,6 +213,7 @@ class _CandleChartPainter extends CustomPainter {
     required this.palette,
     required this.selectedIndex,
     this.averageLineValue,
+    this.smaValues = const [],
   });
 
   final List<CandlePoint> candles;
@@ -208,6 +221,7 @@ class _CandleChartPainter extends CustomPainter {
   final TerminalPalette palette;
   final int? selectedIndex;
   final double? averageLineValue;
+  final List<double?> smaValues;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -225,6 +239,11 @@ class _CandleChartPainter extends CustomPainter {
     if (averageLineValue != null) {
       if (averageLineValue! < minY) minY = averageLineValue!;
       if (averageLineValue! > maxY) maxY = averageLineValue!;
+    }
+    for (final v in smaValues) {
+      if (v == null) continue;
+      if (v < minY) minY = v;
+      if (v > maxY) maxY = v;
     }
 
     var span = maxY - minY;
@@ -286,6 +305,13 @@ class _CandleChartPainter extends CustomPainter {
     final count = candles.length;
     final stepX = count == 1 ? plotW : plotW / count;
 
+    double indexToX(int i) {
+      if (count == 1) return plotW / 2;
+      return mode == ChartDisplayMode.area
+          ? (i / (count - 1)) * plotW
+          : (i + 0.5) * stepX;
+    }
+
     if (mode == ChartDisplayMode.area) {
       final isOverallUp = candles.last.close >= candles.first.close;
       final lineColor = isOverallUp ? palette.bull : palette.bear;
@@ -293,7 +319,7 @@ class _CandleChartPainter extends CustomPainter {
       final fillPath = Path();
 
       for (var i = 0; i < count; i++) {
-        final x = count == 1 ? plotW / 2 : (i / (count - 1)) * plotW;
+        final x = indexToX(i);
         final y = toY(candles[i].close);
         if (i == 0) {
           linePath.moveTo(x, y);
@@ -334,7 +360,7 @@ class _CandleChartPainter extends CustomPainter {
       final bodyW = (stepX * 0.56).clamp(3.0, 14.0);
       for (var i = 0; i < count; i++) {
         final c = candles[i];
-        final cx = count == 1 ? plotW / 2 : (i + 0.5) * stepX;
+        final cx = indexToX(i);
         final color = c.isBullish ? palette.bull : palette.bear;
 
         final yHigh = toY(c.high);
@@ -363,14 +389,38 @@ class _CandleChartPainter extends CustomPainter {
       }
     }
 
+    // Optional SMA(5) Moving Average curve overlay.
+    if (smaValues.isNotEmpty) {
+      final smaPath = Path();
+      var started = false;
+      for (var i = 0; i < math.min(count, smaValues.length); i++) {
+        final val = smaValues[i];
+        if (val == null) continue;
+        final x = indexToX(i);
+        final y = toY(val);
+        if (!started) {
+          smaPath.moveTo(x, y);
+          started = true;
+        } else {
+          smaPath.lineTo(x, y);
+        }
+      }
+      if (started) {
+        canvas.drawPath(
+          smaPath,
+          Paint()
+            ..color = palette.warning
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.6
+            ..strokeCap = StrokeCap.round,
+        );
+      }
+    }
+
     // Bottom date ticks (start, middle, end).
     final dateIndices = <int>{0, count ~/ 2, count - 1};
     for (final idx in dateIndices) {
-      final cx = count == 1
-          ? plotW / 2
-          : mode == ChartDisplayMode.area
-              ? (idx / (count - 1)) * plotW
-              : (idx + 0.5) * stepX;
+      final cx = indexToX(idx);
       final label = MarketNumberFormatter.formatDateShort(candles[idx].timestamp);
       final clampedX = cx.clamp(0.0, math.max(0.0, plotW - 32)).toDouble();
       _drawLabel(
@@ -387,11 +437,7 @@ class _CandleChartPainter extends CustomPainter {
         selectedIndex! >= 0 &&
         selectedIndex! < count) {
       final idx = selectedIndex!;
-      final cx = count == 1
-          ? plotW / 2
-          : mode == ChartDisplayMode.area
-              ? (idx / (count - 1)) * plotW
-              : (idx + 0.5) * stepX;
+      final cx = indexToX(idx);
       final cy = toY(candles[idx].close);
 
       final crossPaint = Paint()
@@ -434,6 +480,7 @@ class _CandleChartPainter extends CustomPainter {
         oldDelegate.mode != mode ||
         oldDelegate.selectedIndex != selectedIndex ||
         oldDelegate.averageLineValue != averageLineValue ||
+        oldDelegate.smaValues != smaValues ||
         oldDelegate.palette != palette;
   }
 }

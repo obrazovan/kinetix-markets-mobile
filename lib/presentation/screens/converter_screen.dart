@@ -25,6 +25,7 @@ class ConverterScreen extends StatefulWidget {
 }
 
 class _ConverterScreenState extends State<ConverterScreen> {
+  static const _quickPresets = ['10', '100', '500', '1000', '0.5'];
   late final TextEditingController _amountCtrl;
 
   @override
@@ -39,6 +40,14 @@ class _ConverterScreenState extends State<ConverterScreen> {
   void dispose() {
     _amountCtrl.dispose();
     super.dispose();
+  }
+
+  void _applyPreset(String val) {
+    _amountCtrl.text = val;
+    widget.converterController.updateAmount(val);
+    if (widget.converterController.canConvert) {
+      widget.converterController.convert();
+    }
   }
 
   @override
@@ -125,6 +134,26 @@ class _ConverterScreenState extends State<ConverterScreen> {
                     borderSide: BorderSide(color: palette.accent, width: 1.4),
                   ),
                 ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: _quickPresets
+                    .map(
+                      (preset) => ActionChip(
+                        label: Text(
+                          preset,
+                          style: TerminalTheme.tabular(
+                            context,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        onPressed: () => _applyPreset(preset),
+                      ),
+                    )
+                    .toList(growable: false),
               ),
               const SizedBox(height: 14),
               Row(

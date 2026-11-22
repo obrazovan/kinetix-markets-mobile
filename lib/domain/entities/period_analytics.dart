@@ -1,9 +1,10 @@
 import 'candle_point.dart';
 
-/// Mandatory comparison windows required by specification.
+/// Supported analytical timeframes selectable inside the Analytics terminal.
 enum AnalyticsTimeframe {
-  week7d(days: 7, titleRu: 'Неделя (7Д)', shortLabel: '7D'),
-  month30d(days: 30, titleRu: 'Месяц (30Д)', shortLabel: '30D');
+  week7d(days: 7, titleRu: 'Неделя (7Д)', shortLabel: '7Д'),
+  twoWeeks14d(days: 14, titleRu: '2 недели (14Д)', shortLabel: '14Д'),
+  month30d(days: 30, titleRu: 'Месяц (30Д)', shortLabel: '30Д');
 
   const AnalyticsTimeframe({
     required this.days,
@@ -16,7 +17,7 @@ enum AnalyticsTimeframe {
   final String shortLabel;
 }
 
-/// Explicit directional trend for comparison screens.
+/// Explicit directional trend for comparison analytics.
 enum TrendDirection {
   up('Рост'),
   down('Падение'),
@@ -27,7 +28,7 @@ enum TrendDirection {
   final String labelRu;
 }
 
-/// Computed statistical summary for a 7-day or 30-day window.
+/// Computed statistical and technical summary for a selected timeframe.
 class PeriodAnalytics {
   const PeriodAnalytics({
     required this.timeframe,
@@ -43,6 +44,8 @@ class PeriodAnalytics {
     required this.volatilityPercent,
     required this.trend,
     required this.isEmpty,
+    this.smaSeries = const [],
+    this.rsi14,
   });
 
   factory PeriodAnalytics.empty({
@@ -79,4 +82,6 @@ class PeriodAnalytics {
   final double volatilityPercent;
   final TrendDirection trend;
   final bool isEmpty;
+  final List<double?> smaSeries;
+  final double? rsi14;
 }
