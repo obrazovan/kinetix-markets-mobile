@@ -30,6 +30,7 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
   void initState() {
     super.initState();
     widget.terminalController.addListener(_onTerminalChanged);
+    widget.converterController.syncSnapshot(widget.terminalController.snapshot);
   }
 
   @override
