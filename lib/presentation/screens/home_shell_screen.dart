@@ -1,14 +1,14 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme/terminal_theme.dart';
-import '../../domain/entities/period_analytics.dart';
 import '../controllers/converter_controller.dart';
 import '../controllers/market_terminal_controller.dart';
 import 'converter_screen.dart';
 import 'markets_terminal_screen.dart';
 import 'period_comparison_screen.dart';
+import 'portfolio_screen.dart';
 
-/// Root navigation shell connecting Markets, 7D, 30D, and Converter screens.
+/// Root navigation shell connecting Markets, Unified Analytics, Portfolio, and Converter.
 class HomeShellScreen extends StatefulWidget {
   const HomeShellScreen({
     super.key,
@@ -133,17 +133,16 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
             children: [
               MarketsTerminalScreen(
                 controller: widget.terminalController,
-                onOpenComparison: (symbol, {required monthly}) {
+                onOpenAnalytics: (symbol, timeframe) {
                   widget.terminalController.selectAnalyticsAsset(symbol);
-                  setState(() => _tabIndex = monthly ? 2 : 1);
+                  widget.terminalController.selectTimeframe(timeframe);
+                  setState(() => _tabIndex = 1);
                 },
               ),
               PeriodComparisonScreen(
-                timeframe: AnalyticsTimeframe.week7d,
                 controller: widget.terminalController,
               ),
-              PeriodComparisonScreen(
-                timeframe: AnalyticsTimeframe.month30d,
+              PortfolioScreen(
                 controller: widget.terminalController,
               ),
               ConverterScreen(
@@ -162,14 +161,14 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
                 label: 'Рынок',
               ),
               NavigationDestination(
-                icon: Icon(Icons.date_range_outlined),
-                selectedIcon: Icon(Icons.date_range_rounded),
-                label: 'Неделя 7Д',
+                icon: Icon(Icons.analytics_outlined),
+                selectedIcon: Icon(Icons.analytics_rounded),
+                label: 'Аналитика',
               ),
               NavigationDestination(
-                icon: Icon(Icons.calendar_month_outlined),
-                selectedIcon: Icon(Icons.calendar_month_rounded),
-                label: 'Месяц 30Д',
+                icon: Icon(Icons.pie_chart_outline_rounded),
+                selectedIcon: Icon(Icons.pie_chart_rounded),
+                label: 'Портфель',
               ),
               NavigationDestination(
                 icon: Icon(Icons.currency_exchange_outlined),

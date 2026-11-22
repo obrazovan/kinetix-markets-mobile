@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/theme/terminal_theme.dart';
 import '../../core/formatters/number_formatter.dart';
 import '../../domain/entities/market_asset.dart';
+import '../../domain/entities/period_analytics.dart';
 import '../controllers/market_terminal_controller.dart';
 import '../widgets/asset_badge.dart';
 import '../widgets/offline_status_banner.dart';
@@ -14,11 +15,11 @@ class MarketsTerminalScreen extends StatelessWidget {
   const MarketsTerminalScreen({
     super.key,
     required this.controller,
-    required this.onOpenComparison,
+    required this.onOpenAnalytics,
   });
 
   final MarketTerminalController controller;
-  final void Function(String symbol, {required bool monthly}) onOpenComparison;
+  final void Function(String symbol, AnalyticsTimeframe timeframe) onOpenAnalytics;
 
   @override
   Widget build(BuildContext context) {
@@ -146,8 +147,15 @@ class MarketsTerminalScreen extends StatelessWidget {
               children: [
                 _CategoryChip(
                   label: 'Все (${controller.allAssets.length})',
-                  selected: controller.selectedCategory == null,
+                  selected: !controller.favoritesOnly &&
+                      controller.selectedCategory == null,
                   onTap: () => controller.setCategory(null),
+                ),
+                const SizedBox(width: 8),
+                _CategoryChip(
+                  label: '★ Избранное',
+                  selected: controller.favoritesOnly,
+                  onTap: controller.toggleFavoritesFilter,
                 ),
                 const SizedBox(width: 8),
                 ...AssetCategory.values.map(
@@ -155,7 +163,8 @@ class MarketsTerminalScreen extends StatelessWidget {
                     padding: const EdgeInsets.only(right: 8),
                     child: _CategoryChip(
                       label: cat.labelRu,
-                      selected: controller.selectedCategory == cat,
+                      selected: !controller.favoritesOnly &&
+                          controller.selectedCategory == cat,
                       onTap: () => controller.setCategory(cat),
                     ),
                   ),
@@ -184,6 +193,9 @@ class MarketsTerminalScreen extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 10),
                 child: _WatchlistRowCard(
                   asset: asset,
+                  isFavorite: controller.isFavorite(asset.symbol),
+                  onToggleFavorite: () =>
+                      controller.toggleFavorite(asset.symbol),
                   onTap: () => _openDetail(context, asset),
                 ),
               ),
@@ -199,9 +211,9 @@ class MarketsTerminalScreen extends StatelessWidget {
         builder: (_) => AssetDetailScreen(
           asset: asset,
           controller: controller,
-          onOpenComparison: (monthly) {
+          onOpenAnalytics: (tf) {
             Navigator.of(context).pop();
-            onOpenComparison(asset.symbol, monthly: monthly);
+            onOpenAnalytics(asset.symbol, tf);
           },
         ),
       ),
@@ -349,9 +361,16 @@ class _CategoryChip extends StatelessWidget {
 }
 
 class _WatchlistRowCard extends StatelessWidget {
-  const _WatchlistRowCard({required this.asset, required this.onTap});
+  const _WatchlistRowCard({
+    required this.asset,
+    required this.isFavorite,
+    required this.onToggleFavorite,
+    required this.onTap,
+  });
 
   final MarketAsset asset;
+  final bool isFavorite;
+  final VoidCallback onToggleFavorite;
   final VoidCallback onTap;
 
   @override
@@ -364,7 +383,7 @@ class _WatchlistRowCard extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
         decoration: BoxDecoration(
           color: palette.surface,
           borderRadius: BorderRadius.circular(14),
@@ -373,7 +392,7 @@ class _WatchlistRowCard extends StatelessWidget {
         child: Row(
           children: [
             AssetBadge(symbol: asset.symbol, category: asset.category),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -392,10 +411,10 @@ class _WatchlistRowCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 5),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
+                          horizontal: 5,
                           vertical: 1.5,
                         ),
                         decoration: BoxDecoration(
@@ -426,14 +445,14 @@ class _WatchlistRowCard extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             SparklineChart(
               candles: asset.candles,
               color: trendColor,
-              width: 58,
-              height: 26,
+              width: 52,
+              height: 24,
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -441,14 +460,14 @@ class _WatchlistRowCard extends StatelessWidget {
                   MarketNumberFormatter.formatPrice(asset.currentPrice),
                   style: TerminalTheme.tabular(
                     context,
-                    fontSize: 14.5,
+                    fontSize: 14,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
+                    horizontal: 6,
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
@@ -459,13 +478,23 @@ class _WatchlistRowCard extends StatelessWidget {
                     MarketNumberFormatter.formatPercent(asset.change24hPercent),
                     style: TerminalTheme.tabular(
                       context,
-                      fontSize: 11,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.w700,
                       color: trendColor,
                     ),
                   ),
                 ),
               ],
+            ),
+            IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+              onPressed: onToggleFavorite,
+              icon: Icon(
+                isFavorite ? Icons.star_rounded : Icons.star_outline_rounded,
+                size: 19,
+                color: isFavorite ? palette.warning : palette.textSecondary,
+              ),
             ),
           ],
         ),

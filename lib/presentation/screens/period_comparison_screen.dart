@@ -10,15 +10,13 @@ import '../widgets/asset_badge.dart';
 import '../widgets/candle_chart_widget.dart';
 import '../widgets/offline_status_banner.dart';
 
-/// Mandatory 7-Day (Weekly) and 30-Day (Monthly) comparison analytics screen.
+/// Unified TradingView-style Analytics & Comparison Terminal (7D / 14D / 30D).
 class PeriodComparisonScreen extends StatefulWidget {
   const PeriodComparisonScreen({
     super.key,
-    required this.timeframe,
     required this.controller,
   });
 
-  final AnalyticsTimeframe timeframe;
   final MarketTerminalController controller;
 
   @override
@@ -27,6 +25,7 @@ class PeriodComparisonScreen extends StatefulWidget {
 
 class _PeriodComparisonScreenState extends State<PeriodComparisonScreen> {
   ChartDisplayMode _chartMode = ChartDisplayMode.area;
+  bool _showSma = true;
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +33,7 @@ class _PeriodComparisonScreenState extends State<PeriodComparisonScreen> {
     final assets = widget.controller.allAssets;
     final selected = widget.controller.selectedAnalyticsAsset;
     final snapshot = widget.controller.snapshot;
+    final timeframe = widget.controller.selectedTimeframe;
 
     if (assets.isEmpty || selected == null) {
       return Center(
@@ -50,16 +50,19 @@ class _PeriodComparisonScreenState extends State<PeriodComparisonScreen> {
       );
     }
 
-    final analytics = widget.controller.computeAnalytics(
+    final analytics = widget.controller.computeAnalytics(selected, timeframe);
+    final weeklyRef = widget.controller.computeAnalytics(
       selected,
-      widget.timeframe,
+      AnalyticsTimeframe.week7d,
     );
-    final weeklyRef = widget.timeframe == AnalyticsTimeframe.month30d
-        ? widget.controller.computeAnalytics(
-            selected,
-            AnalyticsTimeframe.week7d,
-          )
-        : null;
+    final monthlyRef = widget.controller.computeAnalytics(
+      selected,
+      AnalyticsTimeframe.month30d,
+    );
+    final benchmark = widget.controller.compareAsset;
+    final benchmarkAnalytics = benchmark == null
+        ? null
+        : widget.controller.computeAnalytics(benchmark, timeframe);
 
     final trendColor = switch (analytics.trend) {
       TrendDirection.up => palette.bull,
@@ -73,6 +76,8 @@ class _PeriodComparisonScreenState extends State<PeriodComparisonScreen> {
       TrendDirection.flat => Icons.trending_flat_rounded,
     };
 
+    final isFav = widget.controller.isFavorite(selected.symbol);
+
     return RefreshIndicator(
       color: palette.accent,
       onRefresh: widget.controller.refresh,
@@ -85,23 +90,44 @@ class _PeriodComparisonScreenState extends State<PeriodComparisonScreen> {
             warnings: snapshot?.warnings ?? const [],
             onRetry: widget.controller.refresh,
           ),
-          Text(
-            widget.timeframe == AnalyticsTimeframe.week7d
-                ? 'Сравнение за неделю (7 дней)'
-                : 'Сравнение за месяц (30 дней)',
-            style: TextStyle(
-              color: palette.textPrimary,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.3,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Аналитика и сравнение',
+                      style: TextStyle(
+                        color: palette.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Период: ${timeframe.titleRu} • ${analytics.points.length} точек',
+                      style: TextStyle(
+                        color: palette.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: isFav ? 'Убрать из избранного' : 'В избранное',
+                onPressed: () =>
+                    widget.controller.toggleFavorite(selected.symbol),
+                icon: Icon(
+                  isFav ? Icons.star_rounded : Icons.star_outline_rounded,
+                  color: isFav ? palette.warning : palette.textSecondary,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Анализ динамики, экстремумов и тренда по выбранному инструменту',
-            style: TextStyle(color: palette.textSecondary, fontSize: 12),
-          ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           SizedBox(
             height: 42,
             child: ListView.separated(
@@ -120,7 +146,7 @@ class _PeriodComparisonScreenState extends State<PeriodComparisonScreen> {
               },
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           _HeroTrendCard(
             asset: selected,
             analytics: analytics,
@@ -128,14 +154,64 @@ class _PeriodComparisonScreenState extends State<PeriodComparisonScreen> {
             trendIcon: trendIcon,
           ),
           const SizedBox(height: 12),
+          // Unified Timeframe Selector (7D / 14D / 30D).
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: palette.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: palette.border),
+            ),
+            child: Row(
+              children: AnalyticsTimeframe.values.map((tf) {
+                final active = tf == timeframe;
+                return Expanded(
+                  child: InkWell(
+                    key: ValueKey('timeframe_${tf.name}'),
+                    onTap: () => widget.controller.selectTimeframe(tf),
+                    borderRadius: BorderRadius.circular(9),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: active
+                            ? palette.accent.withValues(alpha: 0.16)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(
+                          color: active ? palette.accent : Colors.transparent,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        tf.titleRu,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight:
+                              active ? FontWeight.w800 : FontWeight.w600,
+                          color:
+                              active ? palette.accent : palette.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(growable: false),
+            ),
+          ),
+          const SizedBox(height: 10),
           Row(
             children: [
-              Text(
-                'График динамики (${analytics.points.length} т.)',
-                style: TextStyle(
-                  color: palette.textSecondary,
-                  fontSize: 12,
+              FilterChip(
+                label: const Text('SMA(5)'),
+                selected: _showSma,
+                onSelected: (v) => setState(() => _showSma = v),
+                selectedColor: palette.warning.withValues(alpha: 0.18),
+                checkmarkColor: palette.warning,
+                labelStyle: TextStyle(
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w700,
+                  color: _showSma ? palette.warning : palette.textSecondary,
                 ),
               ),
               const Spacer(),
@@ -159,8 +235,9 @@ class _PeriodComparisonScreenState extends State<PeriodComparisonScreen> {
           CandleChartWidget(
             candles: analytics.points,
             mode: _chartMode,
-            height: 230,
+            height: 235,
             averageLineValue: analytics.isEmpty ? null : analytics.averagePrice,
+            smaValues: _showSma ? analytics.smaSeries : const [],
           ),
           const SizedBox(height: 14),
           GridView.count(
@@ -224,12 +301,28 @@ class _PeriodComparisonScreenState extends State<PeriodComparisonScreen> {
               ),
             ],
           ),
-          if (weeklyRef != null && !weeklyRef.isEmpty) ...[
-            const SizedBox(height: 14),
+          if (analytics.rsi14 != null) ...[
+            const SizedBox(height: 12),
+            _RsiIndicatorCard(rsi: analytics.rsi14!),
+          ],
+          if (!weeklyRef.isEmpty && !monthlyRef.isEmpty) ...[
+            const SizedBox(height: 12),
             _MonthlyVsWeeklyBanner(
               weekly: weeklyRef,
-              monthly: analytics,
-              quoteCurrency: selected.quoteCurrency,
+              monthly: monthlyRef,
+            ),
+          ],
+          if (benchmark != null &&
+              benchmarkAnalytics != null &&
+              !benchmarkAnalytics.isEmpty) ...[
+            const SizedBox(height: 12),
+            _BenchmarkCompareCard(
+              primary: selected,
+              primaryAnalytics: analytics,
+              benchmark: benchmark,
+              benchmarkAnalytics: benchmarkAnalytics,
+              allAssets: assets,
+              onSelectBenchmark: widget.controller.selectCompareAsset,
             ),
           ],
         ],
@@ -391,16 +484,83 @@ class _HeroTrendCard extends StatelessWidget {
   }
 }
 
+class _RsiIndicatorCard extends StatelessWidget {
+  const _RsiIndicatorCard({required this.rsi});
+
+  final double rsi;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = TerminalTheme.of(context);
+    final String zone;
+    final Color zoneColor;
+    if (rsi >= 70) {
+      zone = 'Перекуплен';
+      zoneColor = palette.bear;
+    } else if (rsi <= 30) {
+      zone = 'Перепродан';
+      zoneColor = palette.bull;
+    } else {
+      zone = 'Нейтрально';
+      zoneColor = palette.accent;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: palette.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Индекс силы тренда RSI(14)',
+                style: TextStyle(
+                  color: palette.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${rsi.toStringAsFixed(1)} · $zone',
+                style: TerminalTheme.tabular(
+                  context,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  color: zoneColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: (rsi / 100.0).clamp(0.0, 1.0),
+              minHeight: 7,
+              backgroundColor: palette.surfaceElevated,
+              valueColor: AlwaysStoppedAnimation<Color>(zoneColor),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _MonthlyVsWeeklyBanner extends StatelessWidget {
   const _MonthlyVsWeeklyBanner({
     required this.weekly,
     required this.monthly,
-    required this.quoteCurrency,
   });
 
   final PeriodAnalytics weekly;
   final PeriodAnalytics monthly;
-  final String quoteCurrency;
 
   @override
   Widget build(BuildContext context) {
@@ -444,6 +604,160 @@ class _MonthlyVsWeeklyBanner extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _BenchmarkCompareCard extends StatelessWidget {
+  const _BenchmarkCompareCard({
+    required this.primary,
+    required this.primaryAnalytics,
+    required this.benchmark,
+    required this.benchmarkAnalytics,
+    required this.allAssets,
+    required this.onSelectBenchmark,
+  });
+
+  final MarketAsset primary;
+  final PeriodAnalytics primaryAnalytics;
+  final MarketAsset benchmark;
+  final PeriodAnalytics benchmarkAnalytics;
+  final List<MarketAsset> allAssets;
+  final ValueChanged<String?> onSelectBenchmark;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = TerminalTheme.of(context);
+    final spreadPct =
+        primaryAnalytics.percentChange - benchmarkAnalytics.percentChange;
+    final spreadColor = spreadPct >= 0 ? palette.bull : palette.bear;
+
+    final candidates = allAssets
+        .where((a) => a.symbol != primary.symbol)
+        .toList(growable: false);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: palette.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.balance_rounded, color: palette.accent, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Сравнение доходности за ${primaryAnalytics.timeframe.shortLabel}',
+                  style: TextStyle(
+                    color: palette.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              DropdownButton<String>(
+                value: benchmark.symbol,
+                isDense: true,
+                underline: const SizedBox.shrink(),
+                items: candidates
+                    .map(
+                      (a) => DropdownMenuItem(
+                        value: a.symbol,
+                        child: Text(
+                          a.displayPair,
+                          style: const TextStyle(fontSize: 12.5),
+                        ),
+                      ),
+                    )
+                    .toList(growable: false),
+                onChanged: onSelectBenchmark,
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _compareCol(
+                  context,
+                  primary.displayPair,
+                  primaryAnalytics.percentChange,
+                ),
+              ),
+              Container(
+                width: 1,
+                height: 30,
+                color: palette.border,
+              ),
+              Expanded(
+                child: _compareCol(
+                  context,
+                  benchmark.displayPair,
+                  benchmarkAnalytics.percentChange,
+                ),
+              ),
+              Container(
+                width: 1,
+                height: 30,
+                color: palette.border,
+              ),
+              Expanded(
+                child: Column(
+                  children: [
+                    Text(
+                      'Спред',
+                      style: TextStyle(
+                        color: palette.textSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      MarketNumberFormatter.formatPercent(spreadPct),
+                      style: TerminalTheme.tabular(
+                        context,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: spreadColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _compareCol(BuildContext context, String label, double pct) {
+    final palette = TerminalTheme.of(context);
+    final color = pct >= 0 ? palette.bull : palette.bear;
+    return Column(
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(color: palette.textSecondary, fontSize: 11),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          MarketNumberFormatter.formatPercent(pct),
+          style: TerminalTheme.tabular(
+            context,
+            fontSize: 13.5,
+            fontWeight: FontWeight.w800,
+            color: color,
+          ),
+        ),
+      ],
     );
   }
 }

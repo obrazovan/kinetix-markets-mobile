@@ -37,6 +37,8 @@ void main() {
       expect(result.absoluteChange, 20.0);
       expect(result.percentChange, closeTo(20.0, 1e-6));
       expect(result.trend, TrendDirection.up);
+      expect(result.smaSeries, hasLength(7));
+      expect(result.rsi14, isNotNull);
     });
 
     test('slices last 30 days accurately and detects downward trend', () {

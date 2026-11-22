@@ -15,12 +15,12 @@ class AssetDetailScreen extends StatefulWidget {
     super.key,
     required this.asset,
     required this.controller,
-    required this.onOpenComparison,
+    required this.onOpenAnalytics,
   });
 
   final MarketAsset asset;
   final MarketTerminalController controller;
-  final void Function(bool monthly) onOpenComparison;
+  final void Function(AnalyticsTimeframe timeframe) onOpenAnalytics;
 
   @override
   State<AssetDetailScreen> createState() => _AssetDetailScreenState();
@@ -132,6 +132,10 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                     label: Text('7Д'),
                   ),
                   ButtonSegment(
+                    value: AnalyticsTimeframe.twoWeeks14d,
+                    label: Text('14Д'),
+                  ),
+                  ButtonSegment(
                     value: AnalyticsTimeframe.month30d,
                     label: Text('30Д'),
                   ),
@@ -145,12 +149,10 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                   ButtonSegment(
                     value: ChartDisplayMode.candles,
                     icon: Icon(Icons.candlestick_chart_rounded, size: 16),
-                    label: Text('Свечи'),
                   ),
                   ButtonSegment(
                     value: ChartDisplayMode.area,
                     icon: Icon(Icons.show_chart_rounded, size: 16),
-                    label: Text('Линия'),
                   ),
                 ],
                 selected: {_chartMode},
@@ -164,6 +166,7 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
             mode: _chartMode,
             height: 250,
             averageLineValue: analytics.isEmpty ? null : analytics.averagePrice,
+            smaValues: analytics.smaSeries,
           ),
           const SizedBox(height: 16),
           GridView.count(
@@ -209,17 +212,19 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => widget.onOpenComparison(false),
-                  icon: const Icon(Icons.date_range_rounded, size: 18),
-                  label: const Text('Сравнение 7Д'),
+                  onPressed: () =>
+                      widget.onOpenAnalytics(AnalyticsTimeframe.week7d),
+                  icon: const Icon(Icons.analytics_outlined, size: 18),
+                  label: const Text('Аналитика 7Д'),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: () => widget.onOpenComparison(true),
-                  icon: const Icon(Icons.calendar_month_rounded, size: 18),
-                  label: const Text('Сравнение 30Д'),
+                  onPressed: () =>
+                      widget.onOpenAnalytics(AnalyticsTimeframe.month30d),
+                  icon: const Icon(Icons.analytics_rounded, size: 18),
+                  label: const Text('Аналитика 30Д'),
                 ),
               ),
             ],

@@ -1,6 +1,7 @@
 import 'package:http/http.dart' as http;
 
 import '../../data/cache/local_snapshot_cache_store.dart';
+import '../../data/cache/user_workspace_store.dart';
 import '../../data/datasources/binance_market_provider.dart';
 import '../../data/datasources/bnm_xml_provider.dart';
 import '../../data/datasources/frankfurter_forex_provider.dart';
@@ -25,6 +26,7 @@ class ServiceLocator {
   factory ServiceLocator.createProduction() {
     final client = http.Client();
     final cacheStore = LocalSnapshotCacheStore();
+    final workspaceStore = UserWorkspaceStore();
 
     final repository = MarketRepositoryImpl(
       providers: [
@@ -44,6 +46,7 @@ class ServiceLocator {
       loadMarketSnapshot: loadSnapshotUseCase,
       calculatePeriodAnalytics: analyticsUseCase,
       repository: repository,
+      workspaceStore: workspaceStore,
     );
 
     final converter = ConverterController(
