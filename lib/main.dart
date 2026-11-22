@@ -1,11 +1,19 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 
+import 'app/app.dart';
+import 'app/di/service_locator.dart';
+
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  final locator = ServiceLocator.createProduction();
+  unawaited(locator.terminalController.initialize());
+
   runApp(
-    const MaterialApp(
-      home: Scaffold(
-        body: Center(child: Text('Kinetix Markets — Core Ready')),
-      ),
+    KinetixMarketsApp(
+      terminalController: locator.terminalController,
+      converterController: locator.converterController,
     ),
   );
 }
